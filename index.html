@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Compressor Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.min.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+    <div class="theme-toggle-container">
+        <button id="themeToggleBtn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
+    </div>
+
+    <div class="container">
+        <h2>⚡ Ultimate Local Media Compressor</h2>
+        <p class="subtitle">100% Secure & Local. Your files never leave your computer.</p>
+
+        <div class="tab-container">
+            <button class="tab-btn active" onclick="switchTab('photo-section')">📸 Photo Compressor</button>
+            <button class="tab-btn" onclick="switchTab('video-section')">🎬 Video Compressor</button>
+        </div>
+
+       <div id="photo-section" class="tab-content active-content">
+            <div id="photoDropZone" class="upload-box photo-box" onclick="document.getElementById('imageInput').click()">
+                <p>Click or Drag & Drop an Image Here</p>
+                <input type="file" id="imageInput" accept="image/*" style="display:none;" multiple>
+            </div>
+            <div id="photoLoading" class="loading-text">Compressing Image... Please wait...</div>
+            <div class="stats">
+               <!-- <div id="photoOriginalSize">Original: --</div>
+                <div id="photoCompressedSize">Compressed: --</div> -->
+            </div>
+            
+            <div id="photoPreviewGrid" class="photo-preview-grid"></div>
+            
+            <button id="photoDownloadBtn" class="btn btn-photo" disabled>📦 Download All Images as ZIP</button>
+        </div>
+
+        <div id="video-section" class="tab-content">
+            <div class="controls-panel">
+                <div class="control-group">
+                    <label for="videoResolution">Target Resolution:</label>
+                    <select id="videoResolution">
+                        <option value="original">Original (Keep Size)</option>
+                        <option value="1920">1080p (Full HD)</option>
+                        <option value="1280" selected>720p (HD - Best Match)</option>
+                        <option value="854">480p (SD - Ultra Small)</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="compressionLevel">Compression Mode (CRF):</label>
+                    <select id="compressionLevel">
+                        <option value="24">Low Compression (High Quality)</option>
+                        <option value="28" selected>Balanced Compression</option>
+                        <option value="32">High Compression (50%+ Off)</option>
+                        <option value="36">Extreme Compression</option>
+                    </select>
+                </div>
+
+                <div class="control-group checkbox-group">
+                    <label for="muteAudioCheckbox" class="checkbox-label">
+                        <input type="checkbox" id="muteAudioCheckbox"> 🔇 Remove Audio (Mute)
+                    </label>
+                </div>
+            </div>
+
+            <div id="videoDropZone" class="upload-box video-box" onclick="document.getElementById('videoInput').click()">
+                <p>Click or Drag & Drop an MP4/MKV Video Here</p>
+                <input type="file" id="videoInput" accept=".mp4, .mkv" style="display:none;">
+            </div>
+            <div id="videoStatus" class="loading-text" style="display: block; color: #555;">Status: Waiting for video file...</div>
+            <div class="stats">
+                <div id="videoOriginalSize">Original: --</div>
+                <div id="videoCompressedSize">Compressed: --</div>
+            </div>
+            <div class="preview-container video-preview-box">
+                <video id="videoPlayer" controls style="display:none;"></video>
+            </div>
+            <button id="videoDownloadBtn" class="btn btn-video" disabled>Download Compressed Video</button>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+    <script src="app-video.js"></script>
+</body>
+</html>
