@@ -1,6 +1,6 @@
 {
   "name": "media-compressor",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Local Media Compressor Software",
   "main": "main.js",
   "scripts": {
@@ -17,6 +17,10 @@
   "build": {
     "appId": "com.mediacompressor.app",
     "productName": "UltimateMediaCompressor",
+    "asar": true,
+    "asarUnpack": [
+      "ffmpeg.exe"
+    ],
     "win": {
       "target": "nsis"
     },

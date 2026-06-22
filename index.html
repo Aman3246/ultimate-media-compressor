@@ -20,7 +20,7 @@
         <p class="subtitle">100% Secure & Local. Your files never leave your computer.</p>
 
         <div class="tab-container">
-            <button class="tab-btn active" onclick="switchTab('photo-section')">📸 Photo Compressor</button>
+            <button class="tab-btn active" onclick="switchTab('photo-section')">🖼️ Photo Compressor</button>
             <button class="tab-btn" onclick="switchTab('video-section')">🎬 Video Compressor</button>
         </div>
 
@@ -30,14 +30,8 @@
                 <input type="file" id="imageInput" accept="image/*" style="display:none;" multiple>
             </div>
             <div id="photoLoading" class="loading-text">Compressing Image... Please wait...</div>
-            <div class="stats">
-               <!-- <div id="photoOriginalSize">Original: --</div>
-                <div id="photoCompressedSize">Compressed: --</div> -->
-            </div>
-            
             <div id="photoPreviewGrid" class="photo-preview-grid"></div>
-            
-            <button id="photoDownloadBtn" class="btn btn-photo" disabled>📦 Download All Images as ZIP</button>
+            <button id="photoDownloadBtn" class="btn btn-photo" disabled>📥 Download All Images as ZIP</button>
         </div>
 
         <div id="video-section" class="tab-content">
@@ -60,6 +54,11 @@
                         <option value="32">High Compression (50%+ Off)</option>
                         <option value="36">Extreme Compression</option>
                     </select>
+                </div>
+
+                <div class="control-group">
+                     <label for="customDateModifier">Modify File Date (Optional):</label>
+                     <input type="datetime-local" id="customDateModifier">
                 </div>
 
                 <div class="control-group checkbox-group">

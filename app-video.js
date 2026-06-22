@@ -1,9 +1,4 @@
-const { createFFmpeg, fetchFile } = FFmpeg;
-
-const ffmpeg = createFFmpeg({ 
-    log: true,
-    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
-});
+const { ipcRenderer } = window.require ? window.require('electron') : { ipcRenderer: null };
 
 const videoInput = document.getElementById('videoInput');
 const videoStatus = document.getElementById('videoStatus');
@@ -12,128 +7,146 @@ const videoPlayer = document.getElementById('videoPlayer');
 
 const videoResolution = document.getElementById('videoResolution');
 const compressionLevel = document.getElementById('compressionLevel');
-const muteAudioCheckbox = document.getElementById('muteAudioCheckbox'); // New checkbox element
-
-let compressedVideoUrl = null;
-
-ffmpeg.setProgress(({ ratio }) => {
-    const percentage = Math.round(ratio * 100);
-    if (percentage >= 0 && percentage <= 100) {
-        videoStatus.innerText = `Status: Compressing Video... [ ${percentage}% Done ]`;
-    }
-});
-
-videoInput.addEventListener('change', async (e) => {
-    if (!e.target.files || e.target.files.length === 0) {
-        videoStatus.innerText = "Status: No file selected.";
-        return;
-    }
-
-    const file = e.target.files[0];
-    if (!file.size) {
-        videoStatus.innerText = "Status: Invalid file object.";
-        return;
-    }
-
-    let fileExtension = "mp4"; 
-    if (file.name && file.name.includes('.')) {
-        fileExtension = file.name.split('.').pop().toLowerCase();
-    }
-    const inputFileName = `input.${fileExtension}`;
-
-    document.getElementById('videoOriginalSize').innerText = `Original: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-    videoDownloadBtn.disabled = true;
-    
-    videoStatus.innerText = "Status: Initializing FFmpeg core module...";
-
-    try {
-        if (!ffmpeg.isLoaded()) {
-            await ffmpeg.load();
-        }
-    } catch (err) {
-        videoStatus.innerText = "Status: Error loading compiler engine.";
-        console.error(err);
-        return;
-    }
-
-    videoStatus.innerText = "Status: Starting compression... [ 0% Done ]";
-
-    try {
-        ffmpeg.FS('writeFile', inputFileName, await fetchFile(file));
-
-        const selectedRes = videoResolution.value; 
-        const selectedCRF = compressionLevel.value;  
-        const shouldMute = muteAudioCheckbox.checked; // Checkbox true hai ya false
-
-        // Basic compression config array
-        let ffmpegArgs = ['-i', inputFileName, '-vcodec', 'libx264', '-crf', selectedCRF];
-
-        // 1. Resolution change filter setup
-        if (selectedRes !== 'original') {
-            ffmpegArgs.push('-vf', `scale=${selectedRes}:-2`);
-        }
-
-        // 2. AUDIO MUTE LOGIC: Agar box checked hai toh '-an' argument insert karo
-        if (shouldMute) {
-            ffmpegArgs.push('-an'); // -an stands for 'Audio None' in FFmpeg
-        }
-
-        // Out path parameters
-        ffmpegArgs.push('-preset', 'ultrafast', 'output.mp4');
-
-        await ffmpeg.run(...ffmpegArgs);
-
-        videoStatus.innerText = "Status: Compression Process Completed! 🎉";
-
-        const data = ffmpeg.FS('readFile', 'output.mp4');
-        const compressedBlob = new Blob([data.buffer], { type: 'video/mp4' });
-        
-        document.getElementById('videoCompressedSize').innerText = `Compressed: ${(compressedBlob.size / 1024 / 1024).toFixed(2)} MB`;
-
-        if (compressedVideoUrl) {
-            URL.revokeObjectURL(compressedVideoUrl);
-        }
-        compressedVideoUrl = URL.createObjectURL(compressedBlob);
-        videoPlayer.src = compressedVideoUrl;
-        videoPlayer.style.display = 'block';
-        
-        videoDownloadBtn.disabled = false;
-
-    } catch (error) {
-        videoStatus.innerText = "Status: System Error occurred during execution.";
-        console.error(error);
-    }
-});
-
-videoDownloadBtn.addEventListener('click', () => {
-    if (!compressedVideoUrl) return;
-    const a = document.createElement('a');
-    a.href = compressedVideoUrl;
-    a.download = 'compressed_video.mp4';
-    a.click();
-});
-
-// ================= VIDEO DRAG & DROP SYSTEM =================
+const muteAudioCheckbox = document.getElementById('muteAudioCheckbox'); 
+const customDateModifier = document.getElementById('customDateModifier');
 const videoDropZone = document.getElementById('videoDropZone');
 
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    videoDropZone.addEventListener(eventName, (e) => e.preventDefault(), false);
+let selectedFileNativePath = null;
+let originalFileDate = null;
+let finalOutputFilePath = null; // Backend se aane wale saved path ko track karne ke liye
+
+// ================= 1. FILE SELECTION SYSTEM =================
+videoInput.addEventListener('change', (e) => {
+    handleVideoSelection(e.target.files);
 });
 
-['dragenter', 'dragover'].forEach(eventName => {
-    videoDropZone.addEventListener(eventName, () => videoDropZone.classList.add('drag-over'), false);
-});
+function handleVideoSelection(files) {
+    if (!files || files.length === 0) return;
 
-['dragleave', 'drop'].forEach(eventName => {
-    videoDropZone.addEventListener(eventName, () => videoDropZone.classList.remove('drag-over'), false);
-});
+    const file = files[0];
+    selectedFileNativePath = file.path; 
+    originalFileDate = file.lastModified ? file.lastModified : Date.now();
 
-videoDropZone.addEventListener('drop', (e) => {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-    if (files.length > 0) {
-        videoInput.files = files;
-        // Hamare purane event listener ko fake event de kar trigger karna
-        videoInput.dispatchEvent(new Event('change')); 
+    document.getElementById('videoOriginalSize').innerText = `Original: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+    document.getElementById('videoCompressedSize').innerText = `Compressed: Waiting...`;
+    
+    // Auto-start compression on selection
+    startCompressionFlow();
+}
+
+function startCompressionFlow() {
+    if (!selectedFileNativePath) return;
+
+    videoPlayer.pause();
+    videoPlayer.src = ""; 
+    videoPlayer.style.display = 'none'; 
+
+    videoStatus.style.display = 'block';
+    videoStatus.innerText = "Status: Initializing system hardware core... [ 0% Done ]";
+    videoDownloadBtn.disabled = true; 
+
+    // Sirf video compression parameters bhejenge
+    ipcRenderer.send('start-native-compression', {
+        inputPath: selectedFileNativePath,
+        resolution: videoResolution.value,
+        crf: compressionLevel.value,
+        mute: muteAudioCheckbox ? muteAudioCheckbox.checked : false
+    });
+}
+
+// ================= 2. LIVE PROGRESS & BACKEND REPLIES (WAPAS AA GAYA ✨) =================
+let totalVideoDurationSeconds = 0; // Duration nikalne ke liye variable
+
+ipcRenderer.on('compression-progress', (event, log) => {
+    // 1. Agar FFmpeg video ki original duration print kare, toh use seconds mein badlo
+    if (log.includes('Duration:')) {
+        const durationMatch = log.match(/Duration:\s*(\d+):(\d+):(\d+)/);
+        if (durationMatch) {
+            totalVideoDurationSeconds = (parseInt(durationMatch[1]) * 3600) + (parseInt(durationMatch[2]) * 60) + parseInt(durationMatch[3]);
+        }
+    }
+
+    // 2. Continuous logs se current timestamp read karke live status aur estimation dikhana
+    if (log.includes('time=')) {
+        const timeMatch = log.match(/time=(\d+):(\d+):(\d+)/);
+        if (timeMatch && totalVideoDurationSeconds > 0) {
+            const currentSeconds = (parseInt(timeMatch[1]) * 3600) + (parseInt(timeMatch[2]) * 60) + parseInt(timeMatch[3]);
+            const progressPercentage = Math.round((currentSeconds / totalVideoDurationSeconds) * 100);
+            
+            if (progressPercentage >= 0 && progressPercentage <= 100) {
+                videoStatus.innerText = `Status: Compressing Video Logs... [ ${progressPercentage}% Done ] ⚡`;
+                return;
+            }
+        }
+        videoStatus.innerText = `Status: Processing video streams on CPU cores... 🔥`;
     }
 });
+
+// app-video.js mein sirf is block ko update karo line 69 ke aas-paas:
+ipcRenderer.on('compression-complete', (event, fileDetails) => {
+    const sizeInMB = (fileDetails.sizeInBytes / 1024 / 1024).toFixed(2);
+    document.getElementById('videoCompressedSize').innerText = `Compressed: ${sizeInMB} MB`;
+    
+    videoStatus.innerText = `Status: Compression Process Completed! 🎉 [Size: ${sizeInMB} MB]`;
+    
+    // NO AUTO-PLAY: Sirf source load hoga, video apne aap chalegi nahi! 🤫
+    videoPlayer.src = `${fileDetails.localUrl}?t=${Date.now()}`; 
+    videoPlayer.style.display = 'block';
+    videoPlayer.preload = "metadata"; // Sirf thumbnail aur data load hoga
+    
+    videoDownloadBtn.disabled = false;
+});
+
+ipcRenderer.on('save-complete', (event, msg) => {
+    videoStatus.innerText = `Status: Video Saved Successfully! 🏁`;
+    alert(msg);
+});
+
+ipcRenderer.on('compression-error', (event, errMsg) => {
+    videoStatus.innerText = `Status: System Error occurred during execution.`;
+    alert(errMsg);
+});
+
+// app-video.js ke download button click listener ko isse badlo:
+videoDownloadBtn.addEventListener('click', () => {
+    if (!selectedFileNativePath) return;
+    
+    videoStatus.innerText = "Status: Opening Save window... Choose where to save your file.";
+    
+    // 🔥 LIVE DATE CAPTURE: Button dabane ke theek is pal par date input se value check hogi
+    let finalTimestamp = originalFileDate || Date.now();
+    const customDateModifier = document.getElementById('customDateModifier');
+    
+    if (customDateModifier && customDateModifier.value) {
+        finalTimestamp = new Date(customDateModifier.value).getTime();
+    }
+
+    // Backend ko trigger event ke sath sath custom timestamp bhi bhejenge
+    ipcRenderer.send('trigger-save-dialog', {
+        inputPath: selectedFileNativePath,
+        customTimestamp: finalTimestamp
+    });
+});
+
+// ================= 4. DRAG & DROP SYSTEM =================
+if (videoDropZone) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        videoDropZone.addEventListener(eventName, (e) => e.preventDefault(), false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        videoDropZone.addEventListener(eventName, () => videoDropZone.classList.add('drag-over'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        videoDropZone.addEventListener(eventName, () => videoDropZone.classList.remove('drag-over'), false);
+    });
+
+    videoDropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            handleVideoSelection(files);
+        }
+    });
+}
